@@ -104,8 +104,8 @@ class MuteApp:
     def __init__(self, root):
         self.root = root
         self.root.title("{} v{}".format(APP_TITLE, APP_VERSION))
-        self.root.geometry("1000x700")
-        self.root.minsize(920, 640)
+        self.root.geometry("1040x780")
+        self.root.minsize(900, 620)
         self.root.configure(bg=BG)
 
         # State
@@ -120,6 +120,9 @@ class MuteApp:
         self.mute_var.trace_add("write", self._on_times_changed)
         self.status_var = StringVar(value="Sẵn sàng.")
         self.substatus_var = StringVar(value="Chọn file hoặc thư mục để bắt đầu")
+        self.out_audio_var = StringVar(value="")
+        self.out_video_var = StringVar(value="")
+        self.suffix_var.trace_add("write", lambda *_: self._update_output_preview())
         self.cycle_var = StringVar(value="")
         self.percent_var = StringVar(value="")
         self.progress_var = IntVar(value=0)
@@ -165,6 +168,7 @@ class MuteApp:
         st.configure("Bg.TFrame", background=BG)
 
         st.configure("Panel.TLabel", background=PANEL, foreground=TEXT_DIM, font=self.f_body)
+        st.configure("PanelHead.TLabel", background=PANEL, foreground=FAINT, font=self.f_label)
         st.configure("PanelMuted.TLabel", background=PANEL, foreground=FAINT, font=self.f_small)
         st.configure("Section.TLabel", background=BG, foreground=FAINT, font=self.f_label)
         st.configure("Status.TLabel", background=BG, foreground=TEXT_DIM, font=self.f_body)
@@ -248,15 +252,38 @@ class MuteApp:
 
         Frame(self.root, bg=BORDER, height=1).pack(fill="x")
 
+        # ───── Footer (pack trước body để luôn được cấp chỗ khi cửa sổ hẹp) ─────
+        footer = Frame(self.root, bg=BG)
+        footer.pack(side="bottom", fill="x", padx=20, pady=12)
+        Frame(self.root, bg=BORDER, height=1).pack(side="bottom", fill="x")
+
+        left = Frame(footer, bg=BG)
+        left.pack(side="left", fill="x", expand=True)
+        ttk.Label(left, textvariable=self.status_var, style="Status.TLabel").pack(anchor="w")
+        ttk.Label(left, textvariable=self.substatus_var, style="SubStatus.TLabel").pack(anchor="w", pady=(2, 0))
+
+        self.btn_start = ttk.Button(footer, text="▶  Bắt đầu xử lý", style="Accent.TButton", command=self.start)
+        self.btn_start.pack(side="right")
+        self.btn_cancel = ttk.Button(footer, text="■  Huỷ", style="Danger.TButton",
+                                     command=self.cancel, state=DISABLED)
+        self.btn_cancel.pack(side="right", padx=(10, 10))
+        ttk.Button(footer, text="Mở thư mục output", style="Ghost.TButton",
+                   command=self.open_output_dir).pack(side="right", padx=(10, 0))
+        ttk.Label(footer, textvariable=self.percent_var, style="Percent.TLabel",
+                  width=5, anchor="e").pack(side="right", padx=(8, 0))
+        self.progress = ttk.Progressbar(footer, variable=self.progress_var, maximum=100,
+                                        length=150, style="Accent.Horizontal.TProgressbar")
+        self.progress.pack(side="right")
+
         # ───── Body ─────
         body = Frame(self.root, bg=BG)
-        body.pack(fill="both", expand=True, padx=20, pady=(16, 0))
+        body.pack(side="top", fill="both", expand=True, padx=20, pady=(16, 0))
 
         # Đầu vào
         self._section(body, "Đầu vào")
-        p_in = self._panel(body, pady=(0, 16))
+        p_in = self._panel(body, pady=(0, 14))
         row = Frame(p_in, bg=PANEL)
-        row.pack(fill="x", padx=14, pady=12)
+        row.pack(fill="x", padx=14, pady=(12, 0))
         self.lbl_input = ttk.Label(row, text="Chưa chọn file/thư mục.", style="Panel.TLabel")
         self.lbl_input.configure(foreground=FAINT)
         self.lbl_input.pack(side="left", fill="x", expand=True)
@@ -264,6 +291,16 @@ class MuteApp:
                    command=self.choose_folder).pack(side="right", padx=(8, 0))
         ttk.Button(row, text="Chọn file…", style="Ghost.TButton",
                    command=self.choose_files).pack(side="right")
+
+        # Giải thích đầu ra theo loại file
+        Frame(p_in, bg=BORDER, height=1).pack(fill="x", padx=14, pady=(12, 0))
+        outbox = Frame(p_in, bg=PANEL)
+        outbox.pack(fill="x", padx=14, pady=(10, 12))
+        ttk.Label(outbox, text="KẾT QUẢ SẼ TẠO RA", style="PanelHead.TLabel").pack(anchor="w")
+        self.lbl_out_audio = ttk.Label(outbox, textvariable=self.out_audio_var, style="PanelMuted.TLabel")
+        self.lbl_out_audio.pack(anchor="w", pady=(6, 0))
+        self.lbl_out_video = ttk.Label(outbox, textvariable=self.out_video_var, style="PanelMuted.TLabel")
+        self.lbl_out_video.pack(anchor="w", pady=(3, 0))
 
         # Thông số
         self._section(body, "Thông số chu kỳ")
@@ -306,7 +343,7 @@ class MuteApp:
         self._section(body, "Nhật ký")
         p_log = self._panel(body, fill="both", expand=True, pady=(0, 16))
         self.txt_log = ScrolledText(
-            p_log, height=9, wrap="word", font=self.f_mono,
+            p_log, height=6, wrap="word", font=self.f_mono,
             bg=LOG_BG, fg=MUTED, insertbackground=TEXT,
             selectbackground=INDIGO, selectforeground="#FFFFFF",
             relief="flat", bd=0, highlightthickness=0, padx=12, pady=10,
@@ -318,30 +355,8 @@ class MuteApp:
         self.txt_log.tag_config("info", foreground=SKY)
         self.txt_log.tag_config("head", foreground=INDIGO_LIGHT)
 
-        # ───── Footer ─────
-        Frame(self.root, bg=BORDER, height=1).pack(fill="x")
-        footer = Frame(self.root, bg=BG)
-        footer.pack(fill="x", padx=20, pady=12)
-
-        left = Frame(footer, bg=BG)
-        left.pack(side="left", fill="x", expand=True)
-        ttk.Label(left, textvariable=self.status_var, style="Status.TLabel").pack(anchor="w")
-        ttk.Label(left, textvariable=self.substatus_var, style="SubStatus.TLabel").pack(anchor="w", pady=(2, 0))
-
-        self.btn_start = ttk.Button(footer, text="▶  Bắt đầu xử lý", style="Accent.TButton", command=self.start)
-        self.btn_start.pack(side="right")
-        self.btn_cancel = ttk.Button(footer, text="■  Huỷ", style="Danger.TButton",
-                                     command=self.cancel, state=DISABLED)
-        self.btn_cancel.pack(side="right", padx=(10, 10))
-        ttk.Button(footer, text="Mở thư mục output", style="Ghost.TButton",
-                   command=self.open_output_dir).pack(side="right", padx=(10, 0))
-        ttk.Label(footer, textvariable=self.percent_var, style="Percent.TLabel",
-                  width=5, anchor="e").pack(side="right", padx=(8, 0))
-        self.progress = ttk.Progressbar(footer, variable=self.progress_var, maximum=100,
-                                        length=150, style="Accent.Horizontal.TProgressbar")
-        self.progress.pack(side="right", padx=(0, 0))
-
         self._on_times_changed()
+        self._update_output_preview()
 
     def _draw_ffmpeg_chip(self):
         c = self.cv_ffmpeg
@@ -426,6 +441,31 @@ class MuteApp:
             c.create_text(on_w + off_w / 2, y, text=lbl_off, fill=FAINT, font=self.f_tiny)
         c.create_text(w, y, anchor="e", text="lặp lại đến hết bài", fill=FAINT, font=self.f_tiny)
 
+    def _update_output_preview(self):
+        """Cập nhật khối 'kết quả sẽ tạo ra' theo loại file đang chọn."""
+        if not hasattr(self, "lbl_out_audio"):
+            return
+        suffix = self.suffix_var.get() or "_processed"
+        n_aud = sum(1 for f in self.input_paths if f.suffix.lower() in AUDIO_EXTS)
+        n_vid = sum(1 for f in self.input_paths if f.suffix.lower() in VIDEO_EXTS)
+
+        if self.input_paths:
+            a = "{} file audio  →  {} file .mp3 đã xử lý tiếng      vd: ten-bai{}.mp3".format(
+                n_aud, n_aud, suffix)
+            v = ("{} file video  →  {} video giữ nguyên hình (chỉ tiếng bị xử lý)  +  {} file .mp3 "
+                 "âm thanh gốc      vd: clip{}.mp4  ·  clip_goc.mp3").format(n_vid, n_vid, n_vid, suffix)
+            self.lbl_out_audio.configure(foreground=SKY if n_aud else FAINT)
+            self.lbl_out_video.configure(foreground=INDIGO_LIGHT if n_vid else FAINT)
+        else:
+            a = "File audio (mp3, wav, m4a, aac, flac…)  →  1 file .mp3 đã xử lý tiếng      vd: ten-bai{}.mp3".format(suffix)
+            v = ("File video (mp4, mov, mkv, avi…)  →  1 video giữ nguyên hình (chỉ tiếng bị xử lý)  +  "
+                 "1 file .mp3 âm thanh gốc chưa xử lý")
+            self.lbl_out_audio.configure(foreground=FAINT)
+            self.lbl_out_video.configure(foreground=FAINT)
+
+        self.out_audio_var.set("•  " + a)
+        self.out_video_var.set("•  " + v)
+
     def _on_progress(self, *_):
         try:
             v = int(self.progress_var.get())
@@ -508,6 +548,7 @@ class MuteApp:
             self.lbl_input.config(text="Đã chọn {} file ({} video)".format(len(self.input_paths), n_vid),
                                   foreground=TEXT_DIM)
             self.substatus_var.set("{} file đang chờ xử lý".format(len(self.input_paths)))
+            self._update_output_preview()
             self.log("[INFO] Đã chọn {} file ({} video).".format(len(self.input_paths), n_vid))
 
     def choose_folder(self):
@@ -524,6 +565,7 @@ class MuteApp:
             self.lbl_input.config(text="Thư mục: {}  ({} file, {} video)".format(folder, len(items), n_vid),
                                   foreground=TEXT_DIM)
             self.substatus_var.set("{} file đang chờ xử lý".format(len(items)))
+            self._update_output_preview()
             self.log("[INFO] Thư mục: {} — tìm thấy {} file ({} video).".format(folder, len(items), n_vid))
 
     def choose_output_dir(self):
