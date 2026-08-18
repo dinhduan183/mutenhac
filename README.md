@@ -46,6 +46,8 @@ Script sẽ tạo `.venv`, cài `pyinstaller`, nhúng `icon.icns` làm icon app,
 2. Đặt `ffmpeg.exe` cạnh `mute_app.py` hoặc thêm vào PATH
 3. Double-click `build_windows.bat`
 
+Script tự bắt `icon.ico` nếu thấy file cạnh script (Windows không đọc được `.icns`). Nếu icon trên Explorer chưa đổi thì là do cache, chạy `ie4uinit.exe -show`.
+
 ## Cách dùng
 
 1. **Chọn file…** (một hoặc nhiều) hoặc **Chọn thư mục…** (cả batch)
@@ -87,7 +89,9 @@ mute_app.py           mã nguồn app (UI + xử lý ffmpeg)
 build_mac.sh          build .app cho macOS
 build_windows.bat     build .exe cho Windows
 MuteNhac.spec         spec PyInstaller (tự sinh khi build)
-icon.icns / icon.png  icon app
+icon.icns             icon cho macOS
+icon.ico              icon cho Windows
+icon.png              icon gốc 1024px
 [Base]process_mp3.sh  script bash gốc trước khi có GUI
 HUONG_DAN.md          hướng dẫn bản cũ
 ```

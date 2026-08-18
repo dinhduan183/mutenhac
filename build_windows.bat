@@ -17,6 +17,13 @@ python -m pip install --upgrade pip
 python -m pip install pyinstaller
 if errorlevel 1 goto :error
 
+REM Icon app (icon.ico canh script). Khong co thi dung icon mac dinh cua PyInstaller
+set ICONARG=
+if exist "%~dp0icon.ico" (
+    echo ==^> Dung icon: icon.ico
+    set ICONARG=--icon "%~dp0icon.ico"
+)
+
 REM Tu dong nhung ffmpeg.exe neu nam canh script
 set EXTRA=
 if exist "%~dp0ffmpeg.exe" (
@@ -27,6 +34,7 @@ if exist "%~dp0ffmpeg.exe" (
 echo ==^> Build .exe
 pyinstaller --noconfirm --windowed --onefile ^
     --name "MuteNhac" ^
+    %ICONARG% ^
     %EXTRA% ^
     mute_app.py
 if errorlevel 1 goto :error
