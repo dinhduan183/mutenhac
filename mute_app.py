@@ -284,13 +284,14 @@ class MuteApp:
         p_in = self._panel(body, pady=(0, 14))
         row = Frame(p_in, bg=PANEL)
         row.pack(fill="x", padx=14, pady=(12, 0))
-        self.lbl_input = ttk.Label(row, text="Chưa chọn file/thư mục.", style="Panel.TLabel")
-        self.lbl_input.configure(foreground=FAINT)
-        self.lbl_input.pack(side="left", fill="x", expand=True)
+        # Pack nút trước để luôn giữ chỗ, nhãn đường dẫn dài không đẩy nút ra khỏi khung
         ttk.Button(row, text="Chọn thư mục…", style="Ghost.TButton",
                    command=self.choose_folder).pack(side="right", padx=(8, 0))
         ttk.Button(row, text="Chọn file…", style="Ghost.TButton",
                    command=self.choose_files).pack(side="right")
+        self.lbl_input = ttk.Label(row, text="Chưa chọn file/thư mục.", style="Panel.TLabel")
+        self.lbl_input.configure(foreground=FAINT)
+        self.lbl_input.pack(side="left", fill="x", expand=True, padx=(0, 10))
 
         # Giải thích đầu ra theo loại file
         Frame(p_in, bg=BORDER, height=1).pack(fill="x", padx=14, pady=(12, 0))
@@ -530,6 +531,16 @@ class MuteApp:
             pass
         self.root.after(80, self._poll_log_queue)
 
+    @staticmethod
+    def _short_path(path, keep=58):
+        """Rút gọn đường dẫn ở giữa để nhãn không đẩy nút ra khỏi khung."""
+        text = str(path)
+        if len(text) <= keep:
+            return text
+        head = keep // 4
+        tail = keep - head - 1
+        return text[:head] + "…" + text[-tail:]
+
     def choose_files(self):
         audio_pat = " ".join("*" + e for e in sorted(AUDIO_EXTS))
         video_pat = " ".join("*" + e for e in sorted(VIDEO_EXTS))
@@ -562,7 +573,8 @@ class MuteApp:
                 return
             self.input_paths = items
             n_vid = sum(1 for f in items if f.suffix.lower() in VIDEO_EXTS)
-            self.lbl_input.config(text="Thư mục: {}  ({} file, {} video)".format(folder, len(items), n_vid),
+            self.lbl_input.config(text="Thư mục: {}  ({} file, {} video)".format(
+                                      self._short_path(folder), len(items), n_vid),
                                   foreground=TEXT_DIM)
             self.substatus_var.set("{} file đang chờ xử lý".format(len(items)))
             self._update_output_preview()
