@@ -237,7 +237,9 @@ class MuteApp:
         logo.pack(side="left")
         for k in range(0, 72):
             logo.create_line(k, 0, 0, k, fill=_mix(INDIGO, PURPLE, k / 72.0))
-        logo.create_text(18, 18, text="♪", fill="#FFFFFF", font=(self.f_title[0], 18, "bold"))
+        logo.create_text(17, 19, text="♪", fill="#FFFFFF", font=(self.f_title[0], 18, "bold"))
+        # Gạch chéo như icon ngoài (nốt nhạc bị gạch = tắt tiếng)
+        logo.create_line(8, 7, 28, 27, fill="#FFFFFF", width=4, capstyle="round")
 
         titles = Frame(header, bg=BG)
         titles.pack(side="left", padx=(12, 0))
