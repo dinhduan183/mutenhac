@@ -1,0 +1,103 @@
+# Tự build MuteNhac cho Windows (.exe) và macOS (.app) rồi đính vào GitHub Release.
+# Chạy khi đẩy tag dạng v* (vd: git tag v2.1 && git push origin v2.1),
+# hoặc chạy tay ở tab Actions → Release → Run workflow, nhập tag đã có (vd v2.0).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag cần build (đã có sẵn trên GitHub), vd v2.0"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Tải ffmpeg.exe
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg_tmp
+          Get-ChildItem ffmpeg_tmp -Recurse -Filter ffmpeg.exe | Select-Object -First 1 | Copy-Item -Destination .\ffmpeg.exe
+          .\ffmpeg.exe -version | Select-Object -First 1
+
+      - name: Build bằng build_windows.bat
+        shell: cmd
+        run: build_windows.bat
+
+      - name: Đóng gói
+        shell: pwsh
+        run: Compress-Archive dist\MuteNhac.exe "MuteNhac-${env:TAG}-Windows.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: MuteNhac-*-Windows.zip
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cài ffmpeg
+        run: brew install ffmpeg
+
+      - name: Build bằng build_mac.sh
+        run: bash build_mac.sh
+
+      - name: Đóng gói
+        run: ditto -c -k --keepParent dist/MuteNhac.app "MuteNhac-${TAG}-macOS.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: MuteNhac-*-macOS.zip
+
+  release:
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Tạo / cập nhật Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" MuteNhac-*.zip --clobber
+          else
+            gh release create "$TAG" MuteNhac-*.zip --title "Mute Nhạc $TAG" --notes-file - <<'EOF'
+          ## Tải về
+
+          - **Windows**: `MuteNhac-…-Windows.zip` → giải nén → chạy `MuteNhac.exe`. SmartScreen chặn thì bấm *More info → Run anyway*.
+          - **macOS (chip Apple M1 trở lên)**: `MuteNhac-…-macOS.zip` → giải nén → kéo `MuteNhac.app` vào Applications → lần đầu *chuột phải → Open*.
+
+          Cả hai bản đã nhúng sẵn ffmpeg, không cần cài thêm. Hướng dẫn đầy đủ: xem README.
+          EOF
+          fi
