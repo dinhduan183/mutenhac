@@ -24,11 +24,19 @@ Với chế độ chêm file phụ: chọn file phụ, app hiện độ dài fil
 - Chọn thư mục lưu riêng hoặc để cùng chỗ file gốc
 - Thanh tiến trình, nhật ký realtime, nút Huỷ
 
+## Tải bản dựng sẵn
+
+Vào trang [**Releases**](https://github.com/dinhduan183/mutenhac/releases/latest) tải:
+- `MuteNhac-…-Windows.zip` → giải nén → chạy `MuteNhac.exe`
+- `MuteNhac-…-macOS.zip` → giải nén → được `MuteNhac.app` (xem cách 1 bên dưới)
+
+Cả hai đã nhúng sẵn ffmpeg, không cần cài thêm gì.
+
 ## Cài đặt trên macOS
 
 ### Cách 1 — Dùng app đã build sẵn
 
-1. Kéo `MuteNhac.app` vào thư mục **Applications**.
+1. Tải `MuteNhac-…-macOS.zip` ở trang Releases, giải nén, kéo `MuteNhac.app` vào thư mục **Applications**.
 2. Lần đầu mở: **chuột phải vào app → Open → Open** (app không ký bởi Apple nên macOS sẽ hỏi). Nếu vẫn bị chặn: **System Settings → Privacy & Security → Open Anyway**.
 
 App đã nhúng sẵn ffmpeg, không cần cài gì thêm. Bản build sẵn chỉ chạy trên Mac chip Apple (M1 trở lên). Mac khác thì build lại theo cách 2.
@@ -65,6 +73,16 @@ Cần 3 file đặt chung một thư mục: `mute_app.py`, `build_windows.bat`, 
 Chỉ muốn chạy thử, không build: mở CMD trong thư mục rồi gõ `python mute_app.py`.
 
 Nếu Windows Defender / SmartScreen chặn exe: bấm **More info → Run anyway**.
+
+## Phát hành phiên bản mới
+
+1. Đổi `APP_VERSION` trong `mute_app.py`, commit và push.
+2. Gắn tag rồi đẩy lên:
+   ```bash
+   git tag v2.1
+   git push origin v2.1
+   ```
+3. GitHub Actions tự build bản Windows + macOS và đính vào Release (khoảng 2–3 phút). Theo dõi ở tab **Actions**.
 
 ## Cách dùng
 
