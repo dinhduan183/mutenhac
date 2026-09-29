@@ -37,6 +37,16 @@ pyinstaller --noconfirm --windowed \
     $EXTRA_DATA \
     mute_app.py
 
+# PyInstaller không tự điền số phiên bản → lấy APP_VERSION trong mute_app.py ghi vào Info.plist
+# (hiện ở Get Info), sau đó ký lại ad-hoc vì sửa plist làm hỏng chữ ký cũ.
+APP_VERSION="$(sed -n 's/^APP_VERSION = "\(.*\)"/\1/p' mute_app.py)"
+echo "==> Ghi phiên bản $APP_VERSION vào Info.plist"
+PLIST="dist/MuteNhac.app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $APP_VERSION" "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $APP_VERSION" "$PLIST" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_VERSION" "$PLIST"
+codesign --force --deep --sign - dist/MuteNhac.app
+
 echo
 echo "==> Xong! App ở: dist/MuteNhac.app"
 echo "    Mở bằng: open dist/MuteNhac.app"
