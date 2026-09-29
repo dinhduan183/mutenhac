@@ -23,3 +23,8 @@ Desktop.ini
 .claude/
 .vscode/
 .idea/
+
+# File sinh ra khi build / file nặng không đưa lên git
+*.spec
+ffmpeg
+ffmpeg.exe
