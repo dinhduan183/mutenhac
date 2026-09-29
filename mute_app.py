@@ -15,6 +15,10 @@ import subprocess
 import threading
 import queue
 import platform
+import json
+import ssl
+import urllib.request
+import webbrowser
 from pathlib import Path
 from tkinter import (
     Tk, Canvas, Frame, StringVar, IntVar, DoubleVar, END, DISABLED, NORMAL,
@@ -25,7 +29,9 @@ from tkinter.scrolledtext import ScrolledText
 
 
 APP_TITLE = "Mute Nhạc - Auto Unmute/Mute MP3"
-APP_VERSION = "2.0"
+APP_VERSION = "2.1"
+GITHUB_REPO = "dinhduan183/mutenhac"
+RELEASES_URL = "https://github.com/{}/releases/latest".format(GITHUB_REPO)
 
 # Định dạng đầu vào hỗ trợ
 VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".m4v", ".webm", ".flv", ".wmv"}
@@ -86,6 +92,36 @@ def find_ffmpeg():
     return None
 
 
+def _version_tuple(v):
+    """'v2.10' → (2, 10). Bỏ qua ký tự không phải số."""
+    return tuple(int(x) for x in re.findall(r"\d+", v))
+
+
+def _is_newer(latest, current):
+    a, b = list(_version_tuple(latest)), list(_version_tuple(current))
+    n = max(len(a), len(b))
+    return a + [0] * (n - len(a)) > b + [0] * (n - len(b))
+
+
+def fetch_latest_release():
+    """Hỏi GitHub bản release mới nhất. Trả về (tag, url) hoặc None nếu lỗi/không có mạng."""
+    try:
+        import certifi  # bản build có kèm certifi → không phụ thuộc chứng chỉ SSL của máy
+        ctx = ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        ctx = ssl.create_default_context()
+    req = urllib.request.Request(
+        "https://api.github.com/repos/{}/releases/latest".format(GITHUB_REPO),
+        headers={"Accept": "application/vnd.github+json", "User-Agent": "MuteNhac/" + APP_VERSION},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=6, context=ctx) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        return data["tag_name"], data.get("html_url") or RELEASES_URL
+    except Exception:
+        return None
+
+
 def _mix(c1, c2, t):
     """Nội suy 2 màu hex theo tỉ lệ t (0..1)."""
     a = tuple(int(c1[i:i + 2], 16) for i in (1, 3, 5))
@@ -119,7 +155,7 @@ class MuteApp:
         self.sub_path = None
         self.sub_duration = None
         self.sub_len_var = DoubleVar(value=5.0)
-        self.sub_info_var = StringVar(value="Chưa chọn file phụ.")
+        self.sub_info_var = StringVar(value="Chưa chọn")
         # Đoạn tắt tiếng ở chế độ mute: "off" = im lặng hẳn, "duck" = giảm còn duck_db
         self.off_kind_var = StringVar(value="off")
         self.duck_db_var = DoubleVar(value=-30.0)
@@ -130,7 +166,7 @@ class MuteApp:
         self.mute_var.trace_add("write", self._on_times_changed)
         self.sub_len_var.trace_add("write", self._on_times_changed)
         self.mode_var.trace_add("write", self._on_mode_changed)
-        self.off_kind_var.trace_add("write", self._on_times_changed)
+        self.off_kind_var.trace_add("write", self._on_off_kind_changed)
         self.duck_db_var.trace_add("write", self._on_times_changed)
         self.status_var = StringVar(value="Sẵn sàng.")
         self.substatus_var = StringVar(value="Chọn file hoặc thư mục để bắt đầu")
@@ -149,6 +185,7 @@ class MuteApp:
 
         self._build_ui()
         self._poll_log_queue()
+        threading.Thread(target=self._check_update, daemon=True).start()
 
         if not self.ffmpeg_path:
             self.log(
@@ -231,15 +268,21 @@ class MuteApp:
                    bordercolor=[("focus", INDIGO)],
                    lightcolor=[("focus", INDIGO)],
                    darkcolor=[("focus", INDIGO)],
-                   arrowcolor=[("active", TEXT)])
+                   arrowcolor=[("disabled", FIELD_BORDER), ("active", TEXT)],
+                   foreground=[("disabled", FAINT)],
+                   fieldbackground=[("disabled", PANEL)])
 
-        st.configure("Panel.TRadiobutton", background=PANEL, foreground=TEXT_DIM, font=self.f_body,
-                     indicatorbackground=FIELD, indicatorforeground=INDIGO_LIGHT,
-                     indicatormargin=(0, 0, 6, 0), focuscolor=PANEL)
-        st.map("Panel.TRadiobutton",
-               background=[("active", PANEL)],
-               foreground=[("active", TEXT)],
-               indicatorbackground=[("selected", INDIGO), ("active", FIELD_BORDER)])
+        for name in ("Panel.TRadiobutton", "Mode.TRadiobutton"):
+            st.configure(name, background=PANEL, foreground=TEXT_DIM, font=self.f_body,
+                         indicatorbackground=FIELD, indicatorforeground=INDIGO_LIGHT,
+                         indicatormargin=(0, 0, 6, 0), focuscolor=PANEL)
+        st.configure("Mode.TRadiobutton", font=(self.f_body[0], self.f_body[1] + 1, "bold"))
+        for name in ("Panel.TRadiobutton", "Mode.TRadiobutton"):
+            # Option đang chọn sáng rõ, option không chọn mờ đi
+            st.map(name,
+                   background=[("active", PANEL)],
+                   foreground=[("selected", TEXT), ("active", TEXT_DIM), ("!selected", FAINT)],
+                   indicatorbackground=[("selected", INDIGO), ("active", FIELD_BORDER)])
 
         st.configure("FieldSm.TSpinbox", padding=(6, 1))
 
@@ -283,6 +326,11 @@ class MuteApp:
         self.cv_ffmpeg = Canvas(header, height=28, width=170, bg=BG, highlightthickness=0, bd=0)
         self.cv_ffmpeg.pack(side="right")
         self._draw_ffmpeg_chip()
+
+        # Chip báo bản mới (chỉ hiện khi GitHub có release mới hơn)
+        self.cv_update = Canvas(header, height=28, width=10, bg=BG, highlightthickness=0, bd=0, cursor="hand2")
+        self._update_url = RELEASES_URL
+        self.cv_update.bind("<Button-1>", lambda _e: webbrowser.open(self._update_url))
 
         Frame(self.root, bg=BORDER, height=1).pack(fill="x")
 
@@ -340,31 +388,13 @@ class MuteApp:
         # Thông số
         self._section(body, "Thông số chu kỳ")
         p_opt = self._panel(body, pady=(0, 16))
+        # Hàng trên cùng: 2 chế độ chính
         moderow = Frame(p_opt, bg=PANEL)
         moderow.pack(fill="x", padx=14, pady=(12, 0))
         ttk.Radiobutton(moderow, text="Tắt tiếng on/off", value="mute", variable=self.mode_var,
-                        style="Panel.TRadiobutton").pack(side="left")
+                        style="Mode.TRadiobutton").pack(side="left")
         ttk.Radiobutton(moderow, text="Chêm file phụ vào đoạn tắt tiếng", value="insert",
-                        variable=self.mode_var, style="Panel.TRadiobutton").pack(side="left", padx=(20, 0))
-        # Chọn file phụ nằm cùng hàng (chỉ hiện ở chế độ chêm) để khung không cao thêm
-        self.sub_box = Frame(moderow, bg=PANEL)
-        ttk.Button(self.sub_box, text="Chọn file phụ…", style="GhostSm.TButton",
-                   command=self.choose_sub_file).pack(side="right")
-        self.lbl_sub = ttk.Label(self.sub_box, textvariable=self.sub_info_var, style="Panel.TLabel")
-        self.lbl_sub.configure(foreground=FAINT)
-        self.lbl_sub.pack(side="right", padx=(0, 10))
-        # Kiểu đoạn tắt tiếng (chỉ hiện ở chế độ tắt tiếng on/off)
-        self.off_box = Frame(moderow, bg=PANEL)
-        ttk.Label(self.off_box, text="dB", style="PanelMuted.TLabel").pack(side="right", padx=(6, 0))
-        self.spn_duck = ttk.Spinbox(self.off_box, from_=-60, to=-1, increment=1,
-                                    textvariable=self.duck_db_var, width=5, style="FieldSm.TSpinbox")
-        self.spn_duck.pack(side="right")
-        ttk.Radiobutton(self.off_box, text="Giảm âm lượng", value="duck", variable=self.off_kind_var,
-                        style="Panel.TRadiobutton").pack(side="right", padx=(16, 8))
-        ttk.Radiobutton(self.off_box, text="Tắt hẳn", value="off", variable=self.off_kind_var,
-                        style="Panel.TRadiobutton").pack(side="right")
-        ttk.Label(self.off_box, text="Đoạn tắt tiếng:", style="PanelMuted.TLabel").pack(side="right", padx=(0, 10))
-        self.off_box.pack(side="right")
+                        variable=self.mode_var, style="Mode.TRadiobutton").pack(side="left", padx=(24, 0))
 
         grid = Frame(p_opt, bg=PANEL)
         grid.pack(fill="x", padx=14, pady=(12, 0))
@@ -388,12 +418,39 @@ class MuteApp:
         self.spn_mute.grid(row=1, column=1, sticky="w", padx=(16, 0), pady=(4, 0))
 
         ttk.Label(grid, text="Hậu tố tên file", style="PanelMuted.TLabel").grid(row=0, column=2, sticky="w", padx=(16, 0))
-        ttk.Entry(grid, textvariable=self.suffix_var, width=22,
+        ttk.Entry(grid, textvariable=self.suffix_var, width=18,
                   style="Field.TEntry").grid(row=1, column=2, sticky="w", padx=(16, 0), pady=(4, 0))
 
+        # Option phụ theo chế độ (cột 3): kiểu đoạn tắt tiếng / file phụ
+        self.lbl_off = ttk.Label(grid, text="Đoạn tắt tiếng", style="PanelMuted.TLabel")
+        self.lbl_off.grid(row=0, column=3, sticky="w", padx=(16, 0))
+        self.off_box = Frame(grid, bg=PANEL)
+        ttk.Radiobutton(self.off_box, text="Tắt hẳn", value="off", variable=self.off_kind_var,
+                        style="Panel.TRadiobutton").pack(side="left")
+        ttk.Radiobutton(self.off_box, text="Giảm âm lượng", value="duck", variable=self.off_kind_var,
+                        style="Panel.TRadiobutton").pack(side="left", padx=(14, 8))
+        self.spn_duck = ttk.Spinbox(self.off_box, from_=-60, to=-1, increment=1,
+                                    textvariable=self.duck_db_var, width=5, style="FieldSm.TSpinbox")
+        self.spn_duck.pack(side="left")
+        self.lbl_db = ttk.Label(self.off_box, text="dB", style="PanelMuted.TLabel")
+        self.lbl_db.pack(side="left", padx=(6, 0))
+        self.off_box.grid(row=1, column=3, sticky="w", padx=(16, 0), pady=(4, 0))
+
+        self.lbl_subfile = ttk.Label(grid, text="File phụ", style="PanelMuted.TLabel")
+        self.lbl_subfile.grid(row=0, column=3, sticky="w", padx=(16, 0))
+        self.sub_box = Frame(grid, bg=PANEL)
+        ttk.Button(self.sub_box, text="Chọn file phụ…", style="GhostSm.TButton",
+                   command=self.choose_sub_file).pack(side="left")
+        self.lbl_sub = ttk.Label(self.sub_box, textvariable=self.sub_info_var, style="Panel.TLabel")
+        self.lbl_sub.configure(foreground=FAINT)
+        self.lbl_sub.pack(side="left", padx=(10, 0))
+        self.sub_box.grid(row=1, column=3, sticky="w", padx=(16, 0), pady=(4, 0))
+        self.lbl_subfile.grid_remove()
+        self.sub_box.grid_remove()
+
         ttk.Label(grid, textvariable=self.cycle_var, style="PanelMuted.TLabel").grid(
-            row=1, column=3, sticky="w", padx=(20, 0), pady=(4, 0))
-        grid.columnconfigure(3, weight=1)
+            row=1, column=4, sticky="w", padx=(20, 0), pady=(4, 0))
+        grid.columnconfigure(4, weight=1)
 
         prev = Frame(p_opt, bg=PANEL)
         prev.pack(fill="x", padx=14, pady=(12, 0))
@@ -426,8 +483,27 @@ class MuteApp:
         self.txt_log.tag_config("info", foreground=SKY)
         self.txt_log.tag_config("head", foreground=INDIGO_LIGHT)
 
-        self._on_times_changed()
+        self._on_off_kind_changed()
         self._update_output_preview()
+
+    def _check_update(self):
+        res = fetch_latest_release()
+        if res and _is_newer(res[0], APP_VERSION):
+            self.root.after(0, self._show_update_chip, res[0], res[1])
+
+    def _show_update_chip(self, tag, url):
+        self._update_url = url
+        c = self.cv_update
+        label = "Có bản {} — Tải về".format(tag)
+        tw = tkfont.Font(font=self.f_small).measure(label)
+        w = tw + 36
+        c.configure(width=w)
+        c.delete("all")
+        c.create_rectangle(1, 2, w - 1, 26, fill=PANEL, outline=AMBER)
+        c.create_text(12, 14, anchor="w", text="↑", fill=AMBER, font=self.f_small)
+        c.create_text(26, 14, anchor="w", text=label, fill=AMBER, font=self.f_small)
+        c.pack(side="right", padx=(0, 10))
+        self.log("[INFO] Có bản mới {} (đang dùng v{}). Tải tại: {}".format(tag, APP_VERSION, url))
 
     def _draw_ffmpeg_chip(self):
         c = self.cv_ffmpeg
@@ -594,19 +670,30 @@ class MuteApp:
 
     def _on_mode_changed(self, *_):
         if self.mode_var.get() == "insert":
-            self.off_box.pack_forget()
-            self.sub_box.pack(side="right", fill="x", expand=True)
+            self.lbl_off.grid_remove()
+            self.off_box.grid_remove()
+            self.lbl_subfile.grid()
+            self.sub_box.grid()
             self.lbl_mute.grid_remove()
             self.spn_mute.grid_remove()
             self.lbl_sub_len.grid()
             self.spn_sub_len.grid()
         else:
-            self.sub_box.pack_forget()
-            self.off_box.pack(side="right")
+            self.lbl_subfile.grid_remove()
+            self.sub_box.grid_remove()
+            self.lbl_off.grid()
+            self.off_box.grid()
             self.lbl_sub_len.grid_remove()
             self.spn_sub_len.grid_remove()
             self.lbl_mute.grid()
             self.spn_mute.grid()
+        self._on_times_changed()
+
+    def _on_off_kind_changed(self, *_):
+        """Chọn 'Tắt hẳn' thì ô dB mờ đi và không sửa được."""
+        duck = self.off_kind_var.get() == "duck"
+        self.spn_duck.state(["!disabled"] if duck else ["disabled"])
+        self.lbl_db.configure(foreground=MUTED if duck else FIELD_BORDER)
         self._on_times_changed()
 
     def _on_suffix_edited(self, *_):
@@ -726,8 +813,8 @@ class MuteApp:
         self.sub_path = Path(f)
         self.sub_duration = dur
         mins, secs = divmod(dur, 60)
-        self.sub_info_var.set("{}  ·  dài {}:{:04.1f} ({:g}s)".format(
-            self._short_path(self.sub_path.name, 40), int(mins), secs, round(dur, 2)))
+        self.sub_info_var.set("{} · dài {}:{:04.1f}".format(
+            self._short_path(self.sub_path.name, 20), int(mins), secs))
         self.lbl_sub.configure(foreground=TEXT_DIM)
         self.spn_sub_len.configure(to=round(dur, 2))
         self.sub_len_var.set(round(dur, 2))

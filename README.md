@@ -1,4 +1,4 @@
-# Mute Nhạc v2.0
+# Mute Nhạc v2.1
 
 App desktop xử lý tiếng của file nhạc và video theo chu kỳ, dùng `ffmpeg`. Mặc định: **3 giây bật tiếng, 8 giây tắt tiếng**, lặp lại đến hết bài.
 
@@ -23,6 +23,7 @@ Với chế độ chêm file phụ: chọn file phụ, app hiện độ dài fil
 - Hậu tố tên file tự sinh theo thông số, sửa tay được
 - Chọn thư mục lưu riêng hoặc để cùng chỗ file gốc
 - Thanh tiến trình, nhật ký realtime, nút Huỷ
+- Tự báo khi có bản mới: mở app lúc có mạng, nếu GitHub có release mới hơn sẽ hiện chip **"Có bản … — Tải về"** ở góc phải, bấm vào để mở trang tải
 
 ## Tải bản dựng sẵn
 

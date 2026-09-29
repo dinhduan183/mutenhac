@@ -10,9 +10,9 @@ echo "==> Tạo virtual env"
 python3 -m venv .venv
 source .venv/bin/activate
 
-echo "==> Cài PyInstaller"
+echo "==> Cài PyInstaller + certifi"
 pip install --upgrade pip
-pip install pyinstaller
+pip install pyinstaller certifi
 
 # Nhúng ffmpeg vào bundle nếu có (tuỳ chọn). Nếu không, app sẽ tìm ffmpeg trên PATH.
 EXTRA_DATA=""

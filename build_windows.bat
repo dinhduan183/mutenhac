@@ -14,7 +14,7 @@ call .venv\Scripts\activate.bat
 
 echo ==^> Cai PyInstaller
 python -m pip install --upgrade pip
-python -m pip install pyinstaller
+python -m pip install pyinstaller certifi
 if errorlevel 1 goto :error
 
 REM Icon app (icon.ico canh script). Khong co thi dung icon mac dinh cua PyInstaller
