@@ -1,4 +1,4 @@
-# Mute Nhạc v2.1
+# Mute Nhạc v2.4
 
 App desktop xử lý tiếng của file nhạc và video theo chu kỳ, dùng `ffmpeg`. Mặc định: **3 giây bật tiếng, 8 giây tắt tiếng**, lặp lại đến hết bài.
 
@@ -8,13 +8,14 @@ Viết bằng Python + Tkinter, chạy được trên macOS và Windows.
 
 **Hai chế độ:**
 
-| Chế độ | Đoạn "tắt tiếng" sẽ là |
+| Chế độ | Đoạn tắt / đoạn chêm sẽ là |
 |---|---|
-| Tắt tiếng on/off → **Tắt hẳn** | im lặng hoàn toàn |
-| Tắt tiếng on/off → **Giảm âm lượng** | bài gốc nhỏ đi theo mức dB (vd -30dB) |
-| **Chêm file phụ** | một đoạn file âm thanh phụ phát đè lên (bài gốc tắt tiếng ở đoạn đó) |
+| Bật/tắt tiếng → **Tắt hẳn** | im lặng hoàn toàn |
+| Bật/tắt tiếng → **Chỉnh âm lượng** | bài gốc nhỏ đi theo mức dB (vd -30dB) |
+| Chêm file phụ → **Tắt hẳn** | một đoạn file âm thanh phụ thay hẳn bài gốc ở đoạn đó |
+| Chêm file phụ → **Chỉnh âm lượng** | file phụ phát đè lên, bài gốc vẫn chạy bên dưới ở mức dB đã chọn (vd -20dB) |
 
-Với chế độ chêm file phụ: chọn file phụ, app hiện độ dài file, nhập số giây muốn lấy (tính từ đầu file phụ). Chu kỳ = số giây bật tiếng + số giây lấy từ file phụ. File ra dài bằng file gốc. File phụ có thể là mp3, wav, m4a… bất kỳ, không cần convert trước.
+Với chế độ chêm file phụ: chọn file phụ, app hiện độ dài file, nhập số giây muốn lấy (tính từ đầu file phụ). Chu kỳ = đoạn bật + đoạn chêm. File ra dài bằng file gốc. File phụ có thể là mp3, wav, m4a… bất kỳ, không cần convert trước.
 
 **Khác:**
 - Chọn nhiều file một lúc hoặc cả thư mục
@@ -80,8 +81,8 @@ Nếu Windows Defender / SmartScreen chặn exe: bấm **More info → Run anywa
 1. Đổi `APP_VERSION` trong `mute_app.py`, commit và push.
 2. Gắn tag rồi đẩy lên:
    ```bash
-   git tag v2.1
-   git push origin v2.1
+   git tag v2.4
+   git push origin v2.4
    ```
 3. GitHub Actions tự build bản Windows + macOS và đính vào Release (khoảng 2–3 phút). Theo dõi ở tab **Actions**.
 
@@ -89,14 +90,14 @@ Nếu Windows Defender / SmartScreen chặn exe: bấm **More info → Run anywa
 
 1. **Chọn file…** hoặc **Chọn thư mục…**
 2. Chọn chế độ:
-   - **Tắt tiếng on/off**: nhập *Bật tiếng* / *Tắt tiếng* (giây), chọn *Tắt hẳn* hoặc *Giảm âm lượng* + mức dB
-   - **Chêm file phụ**: bấm *Chọn file phụ…*, nhập *Bật tiếng* (khoảng hát) và *Lấy file phụ* (giây)
+   - **Bật/tắt tiếng**: nhập *Đoạn bật* / *Đoạn tắt* (giây), ở *Nhạc gốc ở đoạn tắt* chọn *Tắt hẳn* hoặc *Chỉnh âm lượng* + mức dB
+   - **Chêm file phụ**: bấm *Chọn file phụ…*, nhập *Đoạn bật* (khoảng hát) và *Đoạn chêm* (giây), ở *Nhạc gốc ở đoạn chêm* chọn *Tắt hẳn* hoặc *Chỉnh âm lượng* + mức dB
 3. (Tuỳ chọn) đổi **Hậu tố tên file** và **Thư mục lưu**
 4. Bấm **▶ Bắt đầu xử lý**
 
 | Đầu vào | Kết quả (vd) |
 |---|---|
-| `bai-hat.mp3` | `bai-hat_3s-on-8s-off.mp3` · `bai-hat_3s-on-8s-giam30dB.mp3` · `bai-hat_3s-on-5s-chen.mp3` |
+| `bai-hat.mp3` | `bai-hat_3s-on-8s-off.mp3` · `bai-hat_3s-on-8s-giam30dB.mp3` · `bai-hat_3s-on-5s-chen.mp3` · `bai-hat_3s-on-5s-chen-giam20dB.mp3` |
 | `clip.mp4` | `clip_3s-on-8s-off.mp4` (đã xử lý tiếng) + `clip_goc.mp3` (âm thanh gốc) |
 
 ## Logic ffmpeg

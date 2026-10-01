@@ -29,7 +29,7 @@ from tkinter.scrolledtext import ScrolledText
 
 
 APP_TITLE = "Mute Nhạc - Auto Unmute/Mute MP3"
-APP_VERSION = "2.3"
+APP_VERSION = "2.4"
 GITHUB_REPO = "dinhduan183/mutenhac"
 RELEASES_URL = "https://github.com/{}/releases/latest".format(GITHUB_REPO)
 
@@ -160,6 +160,9 @@ class MuteApp:
         self.sub_info_var = StringVar(value="Chưa chọn")
         # Âm lượng file phụ khi chêm (dB, 0 = giữ nguyên)
         self.sub_db_var = DoubleVar(value=0.0)
+        # Nhạc gốc ở phần bị file phụ đè: "off" = tắt tiếng, "duck" = giữ lại ở mức under_db
+        self.under_kind_var = StringVar(value="off")
+        self.under_db_var = DoubleVar(value=-20.0)
         # Đoạn tắt tiếng ở chế độ mute: "off" = im lặng hẳn, "duck" = giảm còn duck_db
         self.off_kind_var = StringVar(value="off")
         self.duck_db_var = DoubleVar(value=-30.0)
@@ -174,6 +177,8 @@ class MuteApp:
         self.sub_len_var.trace_add("write", self._on_times_changed)
         self.mode_var.trace_add("write", self._on_mode_changed)
         self.off_kind_var.trace_add("write", self._on_off_kind_changed)
+        self.under_kind_var.trace_add("write", self._on_under_kind_changed)
+        self.under_db_var.trace_add("write", self._on_times_changed)
         self.duck_db_var.trace_add("write", self._on_times_changed)
         self.on_db_var.trace_add("write", lambda *_: self._draw_cycle_preview())
         self.sub_db_var.trace_add("write", lambda *_: self._draw_cycle_preview())
@@ -359,7 +364,7 @@ class MuteApp:
         self.btn_cancel = ttk.Button(footer, text="■  Huỷ", style="Danger.TButton",
                                      command=self.cancel, state=DISABLED)
         self.btn_cancel.pack(side="right", padx=(10, 10))
-        ttk.Button(footer, text="Mở thư mục output", style="Ghost.TButton",
+        ttk.Button(footer, text="Mở thư mục lưu", style="Ghost.TButton",
                    command=self.open_output_dir).pack(side="right", padx=(10, 0))
         ttk.Label(footer, textvariable=self.percent_var, style="Percent.TLabel",
                   width=5, anchor="e").pack(side="right", padx=(8, 0))
@@ -401,9 +406,9 @@ class MuteApp:
         # Hàng trên cùng: 2 chế độ chính
         moderow = Frame(p_opt, bg=PANEL)
         moderow.pack(fill="x", padx=14, pady=(12, 0))
-        ttk.Radiobutton(moderow, text="Tắt tiếng on/off", value="mute", variable=self.mode_var,
+        ttk.Radiobutton(moderow, text="Bật/tắt tiếng", value="mute", variable=self.mode_var,
                         style="Mode.TRadiobutton").pack(side="left")
-        ttk.Radiobutton(moderow, text="Chêm file phụ vào đoạn tắt tiếng", value="insert",
+        ttk.Radiobutton(moderow, text="Chêm file phụ", value="insert",
                         variable=self.mode_var, style="Mode.TRadiobutton").pack(side="left", padx=(24, 0))
         ttk.Label(moderow, textvariable=self.cycle_var, style="PanelMuted.TLabel").pack(side="right")
         # Mốc dừng xử lý: sau mốc này giữ nguyên tiếng gốc (trống = xử lý hết bài)
@@ -415,7 +420,7 @@ class MuteApp:
         grid = Frame(p_opt, bg=PANEL)
         grid.pack(fill="x", padx=14, pady=(12, 0))
 
-        ttk.Label(grid, text="Bật tiếng (giây)", style="PanelMuted.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(grid, text="Đoạn bật (giây)", style="PanelMuted.TLabel").grid(row=0, column=0, sticky="w")
         on_box = Frame(grid, bg=PANEL)
         ttk.Spinbox(on_box, from_=0.1, to=600, increment=0.5, textvariable=self.unmute_var,
                     width=6, style="Field.TSpinbox").pack(side="left")
@@ -424,10 +429,10 @@ class MuteApp:
         ttk.Label(on_box, text="dB", style="PanelMuted.TLabel").pack(side="left", padx=(6, 0))
         on_box.grid(row=1, column=0, sticky="w", pady=(4, 0))
 
-        self.lbl_mute = ttk.Label(grid, text="Tắt tiếng (giây)", style="PanelMuted.TLabel")
+        self.lbl_mute = ttk.Label(grid, text="Đoạn tắt (giây)", style="PanelMuted.TLabel")
         self.lbl_mute.grid(row=0, column=1, sticky="w", padx=(16, 0))
         # Ô thời lượng file phụ thế vào đúng chỗ ô Tắt tiếng khi ở chế độ chêm
-        self.lbl_sub_len = ttk.Label(grid, text="Lấy file phụ (giây)", style="PanelMuted.TLabel")
+        self.lbl_sub_len = ttk.Label(grid, text="Đoạn chêm (giây)", style="PanelMuted.TLabel")
         self.lbl_sub_len.grid(row=0, column=1, sticky="w", padx=(16, 0))
         self.spn_sub_len = ttk.Spinbox(grid, from_=0.1, to=600, increment=0.5,
                                        textvariable=self.sub_len_var, width=6, style="Field.TSpinbox")
@@ -439,7 +444,7 @@ class MuteApp:
         self.spn_mute.grid(row=1, column=1, sticky="w", padx=(16, 0), pady=(4, 0))
 
         # Option phụ theo chế độ (cột 2): kiểu đoạn tắt tiếng / file phụ
-        self.lbl_off = ttk.Label(grid, text="Đoạn tắt tiếng", style="PanelMuted.TLabel")
+        self.lbl_off = ttk.Label(grid, text="Nhạc gốc ở đoạn tắt", style="PanelMuted.TLabel")
         self.lbl_off.grid(row=0, column=2, sticky="w", padx=(24, 0))
         self.off_box = Frame(grid, bg=PANEL)
         ttk.Radiobutton(self.off_box, text="Tắt hẳn", value="off", variable=self.off_kind_var,
@@ -467,6 +472,22 @@ class MuteApp:
         self.sub_box.grid(row=1, column=2, sticky="w", padx=(24, 0), pady=(4, 0))
         self.lbl_subfile.grid_remove()
         self.sub_box.grid_remove()
+
+        # Phần nhạc gốc bị file phụ đè: tắt tiếng hoặc giữ lại ở một mức dB
+        self.under_box = Frame(grid, bg=PANEL)
+        ttk.Label(self.under_box, text="Nhạc gốc ở đoạn chêm:", style="PanelMuted.TLabel").pack(side="left", padx=(0, 8))
+        ttk.Radiobutton(self.under_box, text="Tắt hẳn", value="off", variable=self.under_kind_var,
+                        style="Panel.TRadiobutton").pack(side="left")
+        ttk.Radiobutton(self.under_box, text="Chỉnh âm lượng", value="duck", variable=self.under_kind_var,
+                        style="Panel.TRadiobutton").pack(side="left", padx=(14, 8))
+        self.spn_under = ttk.Spinbox(self.under_box, from_=-60, to=20, increment=1,
+                                     textvariable=self.under_db_var, width=5, style="FieldSm.TSpinbox")
+        self.spn_under.pack(side="left")
+        self.lbl_under_db = ttk.Label(self.under_box, text="dB", style="PanelMuted.TLabel")
+        self.lbl_under_db.pack(side="left", padx=(6, 0))
+        self.under_box.grid(row=2, column=2, sticky="w", padx=(24, 0), pady=(6, 0))
+        self.under_box.grid_remove()
+        self._on_under_kind_changed()
 
 
         prev = Frame(p_opt, bg=PANEL)
@@ -552,6 +573,8 @@ class MuteApp:
             m = max(0.1, float(self.sub_len_var.get() if insert else self.mute_var.get()))
             duck = (float(self.duck_db_var.get())
                     if not insert and self.off_kind_var.get() == "duck" else None)
+            under = (float(self.under_db_var.get())
+                     if insert and self.under_kind_var.get() == "duck" else None)
         except Exception:
             return
 
@@ -568,6 +591,7 @@ class MuteApp:
         on_scale = db_scale(on_db)
         sub_scale = db_scale(sub_db)
         duck_scale = db_scale(duck) if duck is not None else 0
+        under_scale = db_scale(under) if under is not None else 0
 
         c.delete("all")
         cycle = u + m
@@ -608,6 +632,11 @@ class MuteApp:
                 a = abs(math.cos(i * 0.47) * math.sin(i * 0.29) + 0.3 * math.cos(i * 1.33))
                 amp = max(1.0, min(1.0, a) * (mid - 3) * sub_scale)
                 c.create_line(x, mid - amp, x, mid + amp, fill=AMBER, width=2)
+                if under is not None:
+                    # Nhạc gốc vẫn chạy dưới file phụ, nhỏ theo mức dB nhạc gốc ở đoạn chêm
+                    a = abs(math.sin(i * 0.63) * math.cos(i * 0.21) + 0.35 * math.sin(i * 1.71))
+                    amp = max(1.0, min(1.0, a) * (mid - 3) * under_scale)
+                    c.create_line(x, mid - amp, x, mid + amp, fill=INDIGO, width=1)
             else:
                 c.create_line(x, mid, x, mid + 1, fill=FAINT)
 
@@ -631,6 +660,8 @@ class MuteApp:
         lbl_on = "bật tiếng {:g}s{}".format(u, db_txt(on_db))
         if insert:
             lbl_off = "file phụ {:g}s{}".format(m, db_txt(sub_db))
+            if under is not None:
+                lbl_off += " · gốc {:+g}dB".format(under)
         elif duck is not None:
             lbl_off = "{} {:g}dB {:g}s".format("tăng" if duck > 0 else "giảm", abs(duck), m)
         else:
@@ -690,7 +721,9 @@ class MuteApp:
             if se or not (h or mi):
                 tail += "{}s".format(se)
         if insert:
-            return "_{}s-on-{}s-chen{}".format(fmt(unmute), fmt(mute), tail)
+            under = ("-{}{}dB".format("tang" if duck_db > 0 else "giam", fmt(abs(duck_db)))
+                     if duck_db is not None else "")
+            return "_{}s-on-{}s-chen{}{}".format(fmt(unmute), fmt(mute), under, tail)
         if duck_db is not None:
             return "_{}s-on-{}s-{}{}dB{}".format(fmt(unmute), fmt(mute),
                                                   "tang" if duck_db > 0 else "giam", fmt(abs(duck_db)), tail)
@@ -723,7 +756,10 @@ class MuteApp:
         try:
             u = float(self.unmute_var.get())
             m = float(self.sub_len_var.get() if insert else self.mute_var.get())
-            duck = float(self.duck_db_var.get()) if self.off_kind_var.get() == "duck" else None
+            if insert:
+                duck = float(self.under_db_var.get()) if self.under_kind_var.get() == "duck" else None
+            else:
+                duck = float(self.duck_db_var.get()) if self.off_kind_var.get() == "duck" else None
         except Exception:
             return
         try:
@@ -742,6 +778,7 @@ class MuteApp:
             self.off_box.grid_remove()
             self.lbl_subfile.grid()
             self.sub_box.grid()
+            self.under_box.grid()
             self.lbl_mute.grid_remove()
             self.spn_mute.grid_remove()
             self.lbl_sub_len.grid()
@@ -749,6 +786,7 @@ class MuteApp:
         else:
             self.lbl_subfile.grid_remove()
             self.sub_box.grid_remove()
+            self.under_box.grid_remove()
             self.lbl_off.grid()
             self.off_box.grid()
             self.lbl_sub_len.grid_remove()
@@ -762,6 +800,13 @@ class MuteApp:
         duck = self.off_kind_var.get() == "duck"
         self.spn_duck.state(["!disabled"] if duck else ["disabled"])
         self.lbl_db.configure(foreground=MUTED if duck else FIELD_BORDER)
+        self._on_times_changed()
+
+    def _on_under_kind_changed(self, *_):
+        """Nhạc gốc ở đoạn chêm chọn 'Tắt hẳn' thì ô dB mờ đi và không sửa được."""
+        duck = self.under_kind_var.get() == "duck"
+        self.spn_under.state(["!disabled"] if duck else ["disabled"])
+        self.lbl_under_db.configure(foreground=MUTED if duck else FIELD_BORDER)
         self._on_times_changed()
 
     def _on_suffix_edited(self, *_):
@@ -889,7 +934,7 @@ class MuteApp:
         self.log("[INFO] File phụ: {} ({:g}s)".format(self.sub_path.name, round(dur, 2)))
 
     def choose_output_dir(self):
-        folder = filedialog.askdirectory(title="Chọn thư mục output")
+        folder = filedialog.askdirectory(title="Chọn thư mục lưu")
         if folder:
             self.output_dir = Path(folder)
             self.lbl_outdir.config(text=str(self.output_dir), foreground=TEXT_DIM)
@@ -899,7 +944,7 @@ class MuteApp:
         if not target and self.input_paths:
             target = self.input_paths[0].parent
         if not target:
-            messagebox.showinfo(APP_TITLE, "Chưa có thư mục output để mở.")
+            messagebox.showinfo(APP_TITLE, "Chưa có thư mục lưu để mở.")
             return
         try:
             if platform.system() == "Darwin":
@@ -953,7 +998,7 @@ class MuteApp:
                 if sub_len <= 0:
                     raise ValueError
             except Exception:
-                messagebox.showerror(APP_TITLE, "Thời lượng lấy từ file phụ phải là số dương.")
+                messagebox.showerror(APP_TITLE, "Đoạn chêm phải là số giây dương.")
                 return
             sub_len = min(sub_len, self.sub_duration)
             try:
@@ -963,7 +1008,16 @@ class MuteApp:
             except Exception:
                 messagebox.showerror(APP_TITLE, "Âm lượng file phụ phải là số ≤ 20 (dB), ví dụ -6 hoặc 6.")
                 return
-            sub = (self.sub_path, sub_len, sub_db)
+            under_db = None
+            if self.under_kind_var.get() == "duck":
+                try:
+                    under_db = float(self.under_db_var.get())
+                    if under_db > 20:
+                        raise ValueError
+                except Exception:
+                    messagebox.showerror(APP_TITLE, "Âm lượng nhạc gốc ở đoạn chêm phải là số ≤ 20 (dB), ví dụ -20.")
+                    return
+            sub = (self.sub_path, sub_len, sub_db, under_db)
             mute = sub_len
 
         duck_db = None
@@ -973,7 +1027,7 @@ class MuteApp:
                 if duck_db > 20:
                     raise ValueError
             except Exception:
-                messagebox.showerror(APP_TITLE, "Mức âm lượng đoạn tắt tiếng phải là số ≤ 20 (dB), ví dụ -30.")
+                messagebox.showerror(APP_TITLE, "Âm lượng nhạc gốc ở đoạn tắt phải là số ≤ 20 (dB), ví dụ -30.")
                 return
 
         self.is_running = True
@@ -1021,8 +1075,9 @@ class MuteApp:
         return proc.returncode, last_line
 
     @staticmethod
-    def _insert_filter(unmute, sub_len, sample_rate, sub_db=0.0, on_db=0.0, limit=None):
-        """filter_complex chêm file phụ: bài gốc tắt tiếng ở đoạn off, file phụ (đã đệm im lặng
+    def _insert_filter(unmute, sub_len, sample_rate, sub_db=0.0, on_db=0.0, limit=None, under_db=None):
+        """filter_complex chêm file phụ: bài gốc ở đoạn off tắt tiếng (under_db=None) hoặc giữ lại
+        ở mức under_db, file phụ (đã đệm im lặng
         bằng đoạn on ở đầu) lặp lại theo đúng chu kỳ rồi trộn đè lên → độ dài giữ nguyên.
         Có limit (giây) thì chỉ xử lý tới mốc đó, sau đó giữ nguyên tiếng gốc."""
         cycle = unmute + sub_len
@@ -1031,12 +1086,13 @@ class MuteApp:
         sub_end = ",atrim=end={:g}".format(limit) if limit else ""
         return (
             "[0:a:0]volume=enable='{until}lt(mod(t,{cycle}),{unmute})':volume={on_db:g}dB,"
-            "volume=enable='{until}gte(mod(t,{cycle}),{unmute})':volume=0,{fmt}[m];"
+            "volume=enable='{until}gte(mod(t,{cycle}),{unmute})':volume={under},{fmt}[m];"
             "[1:a:0]atrim=0:{sub_len},asetpts=PTS-STARTPTS,{fmt},volume={sub_db:g}dB,apad=whole_dur={sub_len},"
             "adelay={delay}:all=1,aloop=loop=-1:size={size}{sub_end}[s];"
             "[m][s]amix=inputs=2:duration=first:normalize=0[out]"
         ).format(cycle=cycle, unmute=unmute, sub_len=sub_len, fmt=fmt, sub_db=sub_db, on_db=on_db,
                  until=until, sub_end=sub_end,
+                 under="{:g}dB".format(under_db) if under_db is not None else "0",
                  delay=int(round(unmute * 1000)), size=int(round(cycle * sample_rate)))
 
     def _run_batch(self, unmute, mute, sub=None, duck_db=None, on_db=0.0, limit=None):
@@ -1051,8 +1107,9 @@ class MuteApp:
         ok, fail = 0, 0
 
         if sub:
-            self.log("[BẮT ĐẦU] {} file • bật tiếng={}s ({:g}dB), chêm {} ({}s, {:g}dB), cycle={}s".format(
-                total, unmute, on_db, sub[0].name, mute, sub[2], cycle))
+            self.log("[BẮT ĐẦU] {} file • bật tiếng={}s ({:g}dB), chêm {} ({}s, {:g}dB), nhạc gốc ở đoạn chêm: {}, cycle={}s".format(
+                total, unmute, on_db, sub[0].name, mute, sub[2],
+                "tắt hẳn" if sub[3] is None else "{:g}dB".format(sub[3]), cycle))
         else:
             self.log("[BẮT ĐẦU] {} file • unmute={}s ({:g}dB), {}={}s, cycle={}s".format(
                 total, unmute, on_db, "{} {}".format("tăng" if duck_db > 0 else "giảm", level) if duck_db is not None else "mute", mute, cycle))
@@ -1083,7 +1140,7 @@ class MuteApp:
                         cmd_v = [
                             self.ffmpeg_path, "-y",
                             "-i", str(src), "-i", str(sub[0]),
-                            "-filter_complex", self._insert_filter(unmute, mute, 48000, sub[2], on_db, limit),
+                            "-filter_complex", self._insert_filter(unmute, mute, 48000, sub[2], on_db, limit, sub[3]),
                             "-map", "0:v:0?", "-map", "[out]",
                             "-c:v", "copy",
                             "-c:a", "aac", "-b:a", "192k",
@@ -1127,7 +1184,7 @@ class MuteApp:
                         cmd = [
                             self.ffmpeg_path, "-y",
                             "-i", str(src), "-i", str(sub[0]),
-                            "-filter_complex", self._insert_filter(unmute, mute, 44100, sub[2], on_db, limit),
+                            "-filter_complex", self._insert_filter(unmute, mute, 44100, sub[2], on_db, limit, sub[3]),
                             "-map", "[out]",
                             str(out_file),
                         ]
