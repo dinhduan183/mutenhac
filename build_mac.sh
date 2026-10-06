@@ -34,6 +34,7 @@ pyinstaller --noconfirm --windowed \
     --name "MuteNhac" \
     --osx-bundle-identifier "com.duan.mutenhac" \
     $ICON_ARG \
+    --add-data "logo.png:." \
     $EXTRA_DATA \
     mute_app.py
 

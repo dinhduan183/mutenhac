@@ -35,6 +35,7 @@ echo ==^> Build .exe
 pyinstaller --noconfirm --windowed --onefile ^
     --name "MuteNhac" ^
     %ICONARG% ^
+    --add-data "%~dp0logo.png;." ^
     %EXTRA% ^
     mute_app.py
 if errorlevel 1 goto :error

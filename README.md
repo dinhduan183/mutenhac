@@ -1,4 +1,4 @@
-# Mute Nhạc v2.5
+# Mute Nhạc v2.6
 
 App desktop xử lý tiếng của file nhạc và video theo chu kỳ, dùng `ffmpeg`. Mặc định: **3 giây bật tiếng, 8 giây tắt tiếng**, lặp lại đến hết bài.
 
@@ -65,7 +65,7 @@ Chỉ muốn chạy thử, không build: `python3 mute_app.py`.
 
 ## Cài đặt trên Windows
 
-Cần 3 file đặt chung một thư mục: `mute_app.py`, `build_windows.bat`, `icon.ico`, và thêm `ffmpeg.exe`.
+Cần các file đặt chung một thư mục: `mute_app.py`, `build_windows.bat`, `icon.ico`, `logo.png`, và thêm `ffmpeg.exe`.
 
 1. **Cài Python** từ <https://www.python.org/downloads/> (bản 3.10 trở lên). Ở màn hình cài đầu tiên **tick "Add python.exe to PATH"**, rồi bấm Install Now (giữ mặc định để có sẵn Tkinter).
 2. **Lấy ffmpeg.exe**: tải `ffmpeg-release-essentials.zip` tại <https://www.gyan.dev/ffmpeg/builds/>, giải nén, lấy file `bin\ffmpeg.exe` bỏ vào cùng thư mục với `mute_app.py`.
@@ -81,8 +81,8 @@ Nếu Windows Defender / SmartScreen chặn exe: bấm **More info → Run anywa
 1. Đổi `APP_VERSION` trong `mute_app.py`, commit và push.
 2. Gắn tag rồi đẩy lên:
    ```bash
-   git tag v2.5
-   git push origin v2.5
+   git tag v2.6
+   git push origin v2.6
    ```
 3. GitHub Actions tự build bản Windows + macOS và đính vào Release (khoảng 2–3 phút). Theo dõi ở tab **Actions**.
 
@@ -129,4 +129,5 @@ build_windows.bat   build MuteNhac.exe cho Windows
 icon.icns           icon macOS
 icon.ico            icon Windows
 new-icon.png        icon gốc
+logo.png            logo 36px trong giao diện (thu nhỏ từ new-icon.png)
 ```

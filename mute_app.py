@@ -21,7 +21,7 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 from tkinter import (
-    Tk, Canvas, Frame, StringVar, IntVar, DoubleVar, END, DISABLED, NORMAL,
+    Tk, Canvas, Frame, Label, PhotoImage, StringVar, IntVar, DoubleVar, END, DISABLED, NORMAL,
     filedialog, messagebox
 )
 from tkinter import ttk, font as tkfont
@@ -29,7 +29,7 @@ from tkinter.scrolledtext import ScrolledText
 
 
 APP_TITLE = "Mute Nhạc - Auto Unmute/Mute MP3"
-APP_VERSION = "2.5"
+APP_VERSION = "2.6"
 GITHUB_REPO = "dinhduan183/mutenhac"
 RELEASES_URL = "https://github.com/{}/releases/latest".format(GITHUB_REPO)
 
@@ -120,13 +120,6 @@ def fetch_latest_release():
         return data["tag_name"], data.get("html_url") or RELEASES_URL
     except Exception:
         return None
-
-
-def _mix(c1, c2, t):
-    """Nội suy 2 màu hex theo tỉ lệ t (0..1)."""
-    a = tuple(int(c1[i:i + 2], 16) for i in (1, 3, 5))
-    b = tuple(int(c2[i:i + 2], 16) for i in (1, 3, 5))
-    return "#{:02x}{:02x}{:02x}".format(*(int(a[i] + (b[i] - a[i]) * t) for i in range(3)))
 
 
 def _mono_family():
@@ -323,13 +316,9 @@ class MuteApp:
         header = Frame(self.root, bg=BG)
         header.pack(fill="x", padx=20, pady=(16, 12))
 
-        logo = Canvas(header, width=36, height=36, bg=BG, highlightthickness=0, bd=0)
-        logo.pack(side="left")
-        for k in range(0, 72):
-            logo.create_line(k, 0, 0, k, fill=_mix(INDIGO, PURPLE, k / 72.0))
-        logo.create_text(17, 19, text="♪", fill="#FFFFFF", font=(self.f_title[0], 18, "bold"))
-        # Gạch chéo như icon ngoài (nốt nhạc bị gạch = tắt tiếng)
-        logo.create_line(8, 7, 28, 27, fill="#FFFFFF", width=4, capstyle="round")
+        # Logo = icon app thu nhỏ 36px (logo.png, sinh từ new-icon.png)
+        self.logo_img = PhotoImage(file=resource_path("logo.png"))
+        Label(header, image=self.logo_img, bg=BG, bd=0).pack(side="left")
 
         titles = Frame(header, bg=BG)
         titles.pack(side="left", padx=(12, 0))
