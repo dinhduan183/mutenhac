@@ -29,7 +29,7 @@ from tkinter.scrolledtext import ScrolledText
 
 
 APP_TITLE = "Mute Nhạc - Auto Unmute/Mute MP3"
-APP_VERSION = "2.4"
+APP_VERSION = "2.5"
 GITHUB_REPO = "dinhduan183/mutenhac"
 RELEASES_URL = "https://github.com/{}/releases/latest".format(GITHUB_REPO)
 

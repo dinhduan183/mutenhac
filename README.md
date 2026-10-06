@@ -1,4 +1,4 @@
-# Mute Nhạc v2.4
+# Mute Nhạc v2.5
 
 App desktop xử lý tiếng của file nhạc và video theo chu kỳ, dùng `ffmpeg`. Mặc định: **3 giây bật tiếng, 8 giây tắt tiếng**, lặp lại đến hết bài.
 
@@ -81,8 +81,8 @@ Nếu Windows Defender / SmartScreen chặn exe: bấm **More info → Run anywa
 1. Đổi `APP_VERSION` trong `mute_app.py`, commit và push.
 2. Gắn tag rồi đẩy lên:
    ```bash
-   git tag v2.4
-   git push origin v2.4
+   git tag v2.5
+   git push origin v2.5
    ```
 3. GitHub Actions tự build bản Windows + macOS và đính vào Release (khoảng 2–3 phút). Theo dõi ở tab **Actions**.
 
