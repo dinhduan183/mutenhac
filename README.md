@@ -128,5 +128,5 @@ build_mac.sh        build MuteNhac.app cho macOS
 build_windows.bat   build MuteNhac.exe cho Windows
 icon.icns           icon macOS
 icon.ico            icon Windows
-icon.png            icon gốc 1024px
+new-icon.png        icon gốc
 ```
